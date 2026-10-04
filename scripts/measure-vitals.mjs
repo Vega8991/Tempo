@@ -7,9 +7,13 @@ import fs from 'node:fs';
 
 const BASE = process.argv[2] || 'http://127.0.0.1:4173/';
 const RUNS = Number(process.env.RUNS || 3);
+// espera tras cada salto de scroll antes de interactuar (el render por software necesita vaciar su cola)
+const SETTLE = Number(process.env.SETTLE || 6000);
 
 const observe = () => {
-  window.__v = { lcp: 0, lcpEl: '', cls: 0, inp: 0, interactions: [] };
+  window.__v = { lcp: 0, lcpEl: '', cls: 0, inp: 0, interactions: [], shifts: [], zones: [[0, 'carga']] };
+  // la zona se asigna por la marca de tiempo del evento (los callbacks del observador llegan tarde)
+  window.__zoneAt = (t) => window.__v.zones.filter(([z]) => z <= t).pop()[1];
   new PerformanceObserver((l) => {
     for (const e of l.getEntries()) {
       window.__v.lcp = e.startTime;
@@ -30,13 +34,15 @@ const observe = () => {
       session += e.value;
       last = e.startTime;
       window.__v.cls = Math.max(window.__v.cls, session);
+      const src = (e.sources || []).map((x) => (x.node && x.node.className ? String(x.node.className).split(' ')[0] : x.node?.nodeName || '?')).join('+');
+      window.__v.shifts.push(`${Math.round(e.startTime)}ms ${e.value.toFixed(3)} ${src}`);
     }
   }).observe({ type: 'layout-shift', buffered: true });
   new PerformanceObserver((l) => {
     for (const e of l.getEntries()) {
       if (!e.interactionId) continue;
       window.__v.inp = Math.max(window.__v.inp, e.duration);
-      window.__v.interactions.push(`${e.name}:${Math.round(e.duration)}`);
+      window.__v.interactions.push({ zone: window.__zoneAt(e.startTime), name: e.name, d: Math.round(e.duration) });
     }
   }).observe({ type: 'event', durationThreshold: 16, buffered: true });
 };
@@ -54,28 +60,47 @@ async function run(profile) {
   }
   await page.goto(BASE + (profile.query || ''), { waitUntil: 'load' });
   await page.waitForTimeout(6000);
-  // interacciones reales: abrir formulario de reserva, escribir, navegar con teclado
-  await page.evaluate(() => document.getElementById('reservar').scrollIntoView());
-  await page.waitForTimeout(1500);
-  await page.click('.reserve__ctas .btn--primary');
-  await page.waitForTimeout(800);
-  await page.keyboard.type('Ana', { delay: 60 });
-  await page.keyboard.press('Tab');
-  await page.waitForTimeout(500);
-  await page.click('.reserve__form .btn--ghost');
-  await page.waitForTimeout(800);
+  // LCP se lee ANTES de cualquier desplazamiento o interacción (la observación termina con la primera interacción)
+  const load = await page.evaluate(() => ({ lcp: window.__v.lcp, lcpEl: window.__v.lcpEl, cls: window.__v.cls }));
+
+  // zona A: escenario 3D detenido (ficha técnica) → coste real de los manejadores
+  await page.evaluate(() => {
+    window.__v.zones.push([performance.now(), 'sin-webgl']);
+    document.getElementById('especificaciones').scrollIntoView();
+  });
+  await page.waitForTimeout(SETTLE);
   if (profile.menu) {
     await page.click('.nav__menu');
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(700);
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(700);
   }
+  // solo clics dentro de la ficha: un Tab llevaría el foco (y el scroll) a la reserva, con el 3D activo
+  for (let i = 0; i < 3; i++) {
+    await page.click('.specs__group dd');
+    await page.waitForTimeout(500);
+  }
+
+  // zona B: reserva, con el reloj 3D visible (si el nivel lo tiene)
+  await page.evaluate(() => {
+    window.__v.zones.push([performance.now(), 'con-escenario']);
+    document.getElementById('reservar').scrollIntoView();
+  });
+  await page.waitForTimeout(SETTLE);
+  await page.click('.reserve__ctas .btn--primary');
+  await page.waitForTimeout(900);
+  await page.keyboard.type('Ana', { delay: 80 });
+  await page.waitForTimeout(400);
+  await page.click('.reserve__form .btn--ghost');
+  await page.waitForTimeout(900);
   const v = await page.evaluate(() => window.__v);
   await browser.close();
-  return v;
+  const inpZone = (z) => Math.max(0, ...v.interactions.filter((i) => i.zone === z).map((i) => i.d));
+  return { ...v, lcp: load.lcp, lcpEl: load.lcpEl, clsLoad: load.cls, inpNoGL: inpZone('sin-webgl'), inpStage: inpZone('con-escenario') };
 }
 
 const profiles = [
+  { name: 'Escritorio 1440×900 · movimiento reducido (STATIC)', context: { viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' }, net: { latency: 40, downloadThroughput: (10 * 1024 * 1024) / 8, uploadThroughput: (5 * 1024 * 1024) / 8 } },
   { name: 'Escritorio 1440×900 · nivel automático', context: { viewport: { width: 1440, height: 900 } }, net: { latency: 40, downloadThroughput: (10 * 1024 * 1024) / 8, uploadThroughput: (5 * 1024 * 1024) / 8 } },
   { name: 'Escritorio 1440×900 · FULL', query: '?tier=full', context: { viewport: { width: 1440, height: 900 } }, net: { latency: 40, downloadThroughput: (10 * 1024 * 1024) / 8, uploadThroughput: (5 * 1024 * 1024) / 8 } },
   {
@@ -92,9 +117,19 @@ for (const p of profiles) {
   const runs = [];
   for (let i = 0; i < RUNS; i++) runs.push(await run(p));
   const med = (k) => runs.map((r) => r[k]).sort((a, b) => a - b)[Math.floor(runs.length / 2)];
-  const r = { profile: p.name, lcp: Math.round(med('lcp')), lcpElement: runs[0].lcpEl, cls: Number(med('cls').toFixed(3)), inp: Math.round(med('inp')), runs };
+  const r = {
+    profile: p.name,
+    lcp: Math.round(med('lcp')),
+    lcpElement: runs[0].lcpEl,
+    cls: Number(med('cls').toFixed(3)),
+    inpNoGL: Math.round(med('inpNoGL')),
+    inpStage: Math.round(med('inpStage')),
+    shifts: runs[0].shifts,
+    runs,
+  };
   results.push(r);
-  console.log(`${p.name}\n  LCP ${r.lcp} ms (${r.lcpElement}) · CLS ${r.cls} · INP ${r.inp} ms  [mediana de ${RUNS}]`);
+  console.log(`${p.name}\n  LCP ${r.lcp} ms (${r.lcpElement}) · CLS ${r.cls} · INP ${r.inpNoGL} ms sin WebGL activo / ${r.inpStage} ms con escenario  [mediana de ${RUNS}]`);
+  if (r.shifts.length) console.log('  desplazamientos:', r.shifts.slice(0, 6).join(' | '));
 }
 fs.mkdirSync('qa-output', { recursive: true });
 fs.writeFileSync('qa-output/vitals.json', JSON.stringify(results, null, 2));

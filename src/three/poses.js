@@ -158,7 +158,7 @@ export const STILL_SHOTS = {
   'watch-back': { ...W, pose: 'caseback' },
   'watch-movement': { ...W, pose: 'movement' },
   'watch-materials': { ...W, pose: 'matIntro', rig: { envTilt: 0.25, envRot: 0.3, fitH: 62, fitW: 62 } },
-  'watch-exploded': { ...W, pose: 'disEnd', rig: { fitH: 100, fitW: 100 } },
+  'watch-exploded': { ...W, pose: 'disEnd', rig: { fitH: 84, fitW: 84, tz: 4 } },
   'watch-calibre': { ...W, pose: 'calibre' },
   'calibre-energy': { ...W, pose: 'chRotor', rig: { dim: 0.6 } },
   'calibre-transmission': { ...W, pose: 'chTrain', rig: { dim: 0.6 } },
@@ -185,7 +185,7 @@ export const STILL_SHOTS = {
     samples: 32,
     aperture: 0.9,
     bg: '#060607',
-    rig: { rotX: 0.22, rotY: -0.5, rotZ: 0.05, tx: 21.2, ty: 0, tz: -0.65, fitH: 9, fitW: 14.4, envTilt: 0.25, envRot: 0.9 },
+    rig: { rotX: 0.22, rotY: -0.5, rotZ: 0.05, tx: 21.2, ty: 0, tz: -0.65, fitH: 9, fitW: 14.4, envTilt: 0.25, envRot: -0.6 },
     portrait: { w: 1200, h: 1800, rig: { fitH: 15, fitW: 10 } },
   },
   'macro-surface': {

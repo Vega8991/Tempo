@@ -83,7 +83,7 @@ export function Disassembly() {
     const steps = el.querySelectorAll('.dis__step');
     steps.forEach((s, i) => {
       const [a, b] = STEPS[i];
-      highlight(ctx, s, a, a + 0.03, b, b + 0.03);
+      highlight(ctx, s, a, a + 0.03, b, b + 0.03, { idle: 0.55, done: 0.72 });
     });
     windowed(ctx, el.querySelector('.dis__outro'), 0.9, 0.95);
   });

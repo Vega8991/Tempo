@@ -14,7 +14,7 @@ export function Finale() {
   const ref = useRef(null);
   useFilmShot('finale', ref, (ctx) => {
     const { el, tl, at, dur } = ctx;
-    const mobile = ctx.layout === 'mobile';
+    const mobile = ctx.layout !== 'desktop'; // móvil y tablet: encuadre más abierto, texto arriba y abajo
     const S = shiftFor(ctx.layout, { shiftX: 0, shiftY: 0 }, { shiftX: 0, shiftY: 0.02 });
     const far = mobile ? { fitH: 150, fitW: 74 } : { fitH: 104, fitW: 80 };
     const near = mobile ? { fitH: 140, fitW: 70 } : { fitH: 94, fitW: 74 };

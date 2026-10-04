@@ -87,6 +87,15 @@
   padding: 0 var(--gutter);
   padding-top: env(safe-area-inset-top);
 }
+.nav::before {
+  /* el contenido pasa por debajo de la navegación sin chocar con los enlaces */
+  content: '';
+  position: absolute;
+  inset: 0 0 -2rem 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(rgba(6, 6, 7, 0.9), rgba(6, 6, 7, 0.55) 55%, rgba(6, 6, 7, 0));
+}
 .nav__logo {
   font-family: var(--serif);
   font-weight: 400;
@@ -320,7 +329,8 @@
   z-index: 1;
   left: calc(50% + var(--hero-sx) * 100%);
   top: calc(50lvh - var(--hero-sy) * 100lvh);
-  width: min(100lvh, 113.33vw);
+  /* el póster cubre 68 mm del plano frontal: misma escala que la cámara 3D */
+  width: min(calc(100lvh * 68 / var(--hero-fit-h)), calc(100vw * 68 / var(--hero-fit-w)));
   max-width: none;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
@@ -438,16 +448,23 @@
 .hero {
   --hero-sx: 0.16;
   --hero-sy: 0.02;
+  --hero-fit-h: 68;
+  --hero-fit-w: 60;
 }
 @media (max-width: 899px) {
   .hero {
     --hero-sx: 0;
-    --hero-sy: 0.12;
+    --hero-sy: 0.2;
+    --hero-fit-h: 118;
+  }
+  .hero__cue-wrap {
+    display: none !important;
   }
 }
 @media (max-width: 599px) {
   .hero {
     --hero-sy: 0.15;
+    --hero-fit-h: 68;
   }
   :root:is([data-tier='full'], [data-tier='lite']) .hero__copy {
     top: auto;
@@ -675,11 +692,12 @@
 :root:is([data-tier='full'], [data-tier='lite']) .dis__step {
   grid-template-columns: 2.2rem 7.5rem 1fr;
   padding: 0.5rem 0;
-  opacity: 0.32;
+  opacity: 0.55; /* reposo: contraste ≥ 4,5:1 incluso sin destacar */
 }
 :root:is([data-tier='full'], [data-tier='lite']) .dis__text {
   font-size: 0.78rem;
   line-height: 1.4;
+  color: var(--ivory);
 }
 :root:is([data-tier='full'], [data-tier='lite']) .dis__name {
   font-size: 1.15rem;
@@ -703,6 +721,7 @@
     column-gap: 1.5rem;
   }
   :root:is([data-tier='full'], [data-tier='lite']) .dis__step {
+    grid-template-columns: 2rem minmax(0, 1fr);
     padding: 0.4rem 0;
   }
   :root:is([data-tier='full'], [data-tier='lite']) .dis__text {

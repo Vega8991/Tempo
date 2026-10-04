@@ -30,6 +30,8 @@ async function overflowAt(width, tier) {
       document.querySelectorAll('main *, header *').forEach((el) => {
         const cs = getComputedStyle(el);
         if (cs.visibility === 'hidden' || cs.display === 'none' || cs.position === 'fixed') return;
+        // capas fijas (póster del hero) y marcos con overflow oculto no desbordan la página
+        for (let p = el.parentElement; p; p = p.parentElement) if (getComputedStyle(p).position === 'fixed') return;
         const b = el.getBoundingClientRect();
         if (b.width && b.right > vw + 1 && !el.closest('.edition__rings, .instrument, .macro__plate, .stage, .finale__dial')) bad.push(`${el.tagName.toLowerCase()}.${[...el.classList].join('.')}`);
       });
@@ -120,9 +122,13 @@ for (const tier of ['lite', 'static']) {
   const stops = [];
   for (let i = 0; i < 12; i++) {
     await page.keyboard.press('Tab');
+    // con WebGL por software (~2 fps) las transiciones de 0,2 s necesitan varios frames
+    await page.waitForTimeout(1200);
     stops.push(
       await page.evaluate(() => {
         const el = document.activeElement;
+        // estado final: se terminan las transiciones en curso antes de medir
+        el.getAnimations().forEach((a) => a.finish());
         const cs = getComputedStyle(el);
         const r = el.getBoundingClientRect();
         return {
@@ -141,7 +147,9 @@ for (const tier of ['lite', 'static']) {
   await page.waitForTimeout(500);
   await page.focus('a[href="#movimiento"].btn');
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(2500);
+  await page
+    .waitForFunction(() => document.activeElement?.id === 'dis-title', null, { timeout: 15000 })
+    .catch(() => {});
   const nav = await page.evaluate(() => ({
     y: window.scrollY,
     top: document.getElementById('movimiento').getBoundingClientRect().top + window.scrollY,
@@ -203,7 +211,7 @@ for (const tier of ['lite', 'static']) {
     tier: document.documentElement.dataset.tier,
     filmActive: window.__tempo.director.active,
   }));
-  add('cambio en caliente a movimiento reducido: limpia película y WebGL', after.tier === 'static' && !after.canvas && !after.filmActive, `triggers ${before}→${after.triggers}, canvas=${after.canvas}`);
+  add('cambio en caliente a movimiento reducido: limpia película y WebGL', after.tier === 'static' && !after.canvas && !after.filmActive, `tier=${after.tier}, película activa=${after.filmActive}, triggers ${before}→${after.triggers}, canvas=${after.canvas}`);
   await page.close();
 }
 

@@ -208,7 +208,7 @@ button {
   letter-spacing: var(--track-label);
   text-transform: uppercase;
   transform: translateY(-160%);
-  transition: transform var(--t-ui) var(--ease-out);
+  transition: transform 0.2s var(--ease-out);
 }
 .skip-link:focus-visible {
   transform: translateY(0);

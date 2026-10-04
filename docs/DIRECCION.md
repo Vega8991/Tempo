@@ -179,6 +179,8 @@ Anchos verificados: 375, 390, 768, 1280, 1440, 1920. Sin desbordamiento horizont
 - Solo `transform` y `opacity` en DOM (blur únicamente en una imagen macro y nunca > 6 px).
 - Three.js, R3F y el modelo en un chunk diferido que se descarga tras el primer pintado; texturas generadas en canvas (0 KB de descarga).
 - Póster AVIF/WebP del hero con `fetchpriority="high"` como candidato LCP; el canvas aparece encima cuando su primer frame está listo.
+- La entrada del hero es **CSS** (empieza con el primer pintado, sin esperar a que JavaScript hidrate). El 3D, al llegar, sincroniza su luz con el tiempo transcurrido; si el visitante ya se desplaza, la entrada se acelera (Web Animations API).
+- **DPR adaptativo**: si la media de frame supera 33 ms, la resolución del lienzo baja por pasos de 0,25 (mínimo 1 en FULL, 0,75 en LITE) y vuelve a subir cuando sobra margen.
 - WebGL: DPR ≤ 2 / ≤ 1.5, render detenido cuando el escenario está oculto (secciones sin 3D) o la pestaña no es visible; geometrías, materiales y texturas liberados al desmontar.
 - Imágenes de escenas fuera del primer pliegue con `loading="lazy"`; en niveles con 3D no se descargan.
 - `content-visibility: auto` en secciones de flujo largo.

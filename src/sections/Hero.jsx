@@ -21,7 +21,13 @@ export function Hero() {
   useFilmShot('hero', ref, (ctx) => {
     const el = ctx.el;
     const L = ctx.layout;
-    const S0 = shiftFor(L, { shiftX: 0.16, shiftY: 0.02 }, { shiftX: 0, shiftY: 0.15 }, { shiftX: 0, shiftY: 0.12 });
+    // encuadre inicial: mismo valor que las variables CSS del póster (--hero-fit-h, --hero-sy…)
+    const S0 = shiftFor(
+      L,
+      { shiftX: 0.16, shiftY: 0.02 },
+      { shiftX: 0, shiftY: 0.15 },
+      { shiftX: 0, shiftY: 0.2, fitH: 118, fitW: 60 },
+    );
     const S = (dx, dy) => shiftFor(L, { shiftX: dx, shiftY: 0 }, { shiftX: 0, shiftY: dy }, { shiftX: 0, shiftY: dy });
     ctx.key(0, { stage: 1, dust: 1 });
     pose(ctx, 0, 'front', { ...S0, dust: 1 });

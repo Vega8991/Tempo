@@ -31,7 +31,10 @@ export default function Scene3D({ tier, onReady }) {
         gl.domElement.setAttribute('aria-hidden', 'true');
         gl.domElement.addEventListener('webglcontextlost', (e) => {
           e.preventDefault();
-          downgradeTier('static-lite');
+          // al desmontar a propósito (p. ej. paso a movimiento reducido) R3F libera el contexto:
+          // solo es un fallo si seguimos en un nivel con 3D
+          const t = document.documentElement.dataset.tier;
+          if (t === 'full' || t === 'lite') downgradeTier('static-lite');
         });
       }}
     >
@@ -45,6 +48,7 @@ function StageContents({ tier, onReady }) {
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   const advance = useThree((s) => s.advance);
+  const setDpr = useThree((s) => s.setDpr);
   const stageRef = useRef(null);
   const time = useRef(0);
 
@@ -71,11 +75,39 @@ function StageContents({ tier, onReady }) {
       .then(() => {
         compiled = true;
       });
+    // resolución adaptativa: si los frames se alargan, el DPR baja por pasos (y sube si sobra margen)
+    const maxDpr = Math.min(window.devicePixelRatio || 1, full ? MOTION.camera.dpr.full : MOTION.camera.dpr.lite);
+    const minDpr = full ? 1 : 0.75;
+    let dpr = maxDpr;
+    let last = 0;
+    let acc = 0;
+    let n = 0;
+    const adapt = (t) => {
+      const dt = last ? t - last : 0;
+      last = t;
+      if (!dt || dt > 0.5) return; // pausas (pestaña oculta, escenario apagado) no cuentan
+      acc += dt;
+      n += 1;
+      if (n < 40) return;
+      const avg = acc / n;
+      acc = 0;
+      n = 0;
+      const next = avg > 1 / 30 ? Math.max(minDpr, dpr - 0.25) : avg < 1 / 55 ? Math.min(maxDpr, dpr + 0.25) : dpr;
+      if (next !== dpr) {
+        dpr = next;
+        setDpr(dpr);
+      }
+    };
+
     const off = director.onFrame((t) => {
       if (!alive || !compiled) return;
-      if (announced && director.rig.stage < 0.003) return; // escenario oculto: render detenido
+      if (announced && director.rig.stage < 0.003) {
+        last = 0; // escenario oculto: render detenido
+        return;
+      }
       time.current = t;
       advance(t * 1000);
+      adapt(t);
       if (!announced) {
         announced = true;
         onReady();
